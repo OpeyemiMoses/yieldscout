@@ -73,11 +73,15 @@ def get_yield_data():
     data = response.json()
     pools = data["data"]
 
+    # EVM chains only — Solana excluded (wallet scanner is EVM-only)
+    EVM_CHAINS = {"Ethereum", "Arbitrum", "Base", "Optimism", "Polygon", "Avalanche"}
+
     filtered = [
         p for p in pools
         if p.get("tvlUsd", 0) > 1_000_000
         and p.get("apy", 0) > 5
         and p.get("apy", 0) < 300
+        and p.get("chain") in EVM_CHAINS
     ]
 
     sorted_pools = sorted(filtered, key=lambda x: x["apy"], reverse=True)
