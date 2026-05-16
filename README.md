@@ -1,36 +1,41 @@
 # YieldScout 🔍
 
-> Live DeFi yield intelligence for every type of investor.
+> Live DeFi yield intelligence — personalized by your wallet.
 
-YieldScout is an AI-powered DeFi research agent that pulls real-time yield data from DeFiLlama, filters out noise, and delivers sharp, actionable reports — tailored to your investor profile.
+YieldScout is an AI-powered DeFi research agent that reads your on-chain stablecoin balance across 6 major EVM chains, automatically assigns your investor profile, and delivers a sharp, actionable yield report — all in one run.
+
+No manual selection. No guesswork. Just connect your wallet and get your report.
 
 ---
 
 ## What It Does
 
 Every run, YieldScout:
-- Fetches live yield data across 500+ DeFi protocols
-- Filters by TVL (min $1M) and APY (max 300%) to remove suspicious pools
-- Ranks the top 20 opportunities
-- Runs AI analysis via the Swarms API
-- Delivers a structured research report in your chosen mode
+1. Scans your wallet across Ethereum, Arbitrum, Base, Optimism, Polygon, and Avalanche
+2. Detects your total stablecoin balance (USDC, USDT, DAI, FRAX, and more)
+3. Automatically assigns your investor persona based on balance
+4. Fetches live yield data across 500+ DeFi protocols via DeFiLlama
+5. Delivers a structured research report tailored to your profile
 
 ---
 
-## Three Persona Modes
+## Auto Persona Assignment
 
-| Mode | For Who | Style |
-|------|---------|-------|
-| 🟢 Retail | Everyday DeFi users | Simple, safe, plain English |
-| 🔴 Power User | DeFi veterans | Technical, deep, alpha-focused |
-| 🔵 DAO / Treasury | Institutions & DAOs | Formal, conservative, capital-aware |
+YieldScout reads your wallet and assigns your mode automatically:
+
+| Balance | Persona | Style |
+|---------|---------|-------|
+| Under $5,000 | 🟢 Retail | Simple, safe, plain English |
+| $5,000 - $100,000 | 🔴 Power User | Technical, deep, alpha-focused |
+| Above $100,000 | 🔵 DAO / Treasury | Formal, conservative, capital-aware |
 
 ---
 
 ## How To Run Locally
 
 **1. Clone the repo**
-git clone https://github.com/OpeyemiMoses/yieldscout.git cd yieldscout
+git clone https://github.com/OpeyemiMoses/yieldscout.git
+cd yieldscout
 
 **2. Create virtual environment**
 python -m venv venv
@@ -43,18 +48,40 @@ pip install -r requirements.txt
 
 Create a `.env` file:
 SWARMS_API_KEY=your_swarms_api_key_here
+DEBANK_API_KEY=your_debank_api_key_here
 
 **5. Run the agent**
 python yieldscout.py
+
+**6. Enter your wallet address when prompted**
+Enter your wallet address: 0xYourWalletHere
+
+---
+
+YieldScout handles everything else automatically.
 
 ---
 
 ## Tech Stack
 
 - **Python** — core language
+- **DeBank Cloud API** — multi-chain stablecoin balance scanning
 - **DeFiLlama API** — live yield data (free, no key needed)
 - **Swarms API** — AI agent brain
 - **OpenAI-compatible endpoint** — via Swarms
+
+## Supported Chains
+
+- Ethereum
+- Arbitrum
+- Base
+- Optimism
+- Polygon
+- Avalanche
+
+## Supported Stablecoins
+
+USDC, USDT, DAI, BUSD, FRAX, LUSD, USDD, TUSD, USDP, GUSD
 
 ---
 
