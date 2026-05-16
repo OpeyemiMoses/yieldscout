@@ -1,12 +1,71 @@
 import os
 import requests
 import json
+import httpx
 from openai import OpenAI
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# ---- Step 1: Fetch live yield data ----
+DEBANK_API_KEY = os.getenv("DEBANK_API_KEY")
+SWARMS_API_KEY = os.getenv("SWARMS_API_KEY")
+
+# Supported stablecoins
+STABLES = {"usdc", "usdt", "dai", "busd", "frax", "lusd", "usdd", "tusd", "usdp", "gusd"}
+
+# ---- Step 1: Get wallet stablecoin balance across chains ----
+def get_stable_balance(wallet_address):
+    print(f"\nScanning wallet: {wallet_address}")
+    print("Checking stablecoin balances across Ethereum, Arbitrum, Base, Optimism, Polygon, Avalanche...\n")
+
+    url = "https://pro-openapi.debank.com/v1/user/all_token_list"
+    headers = {
+        "accept": "application/json",
+        "AccessKey": DEBANK_API_KEY
+    }
+    params = {
+        "id": wallet_address,
+        "is_all": "false"
+    }
+
+    response = httpx.get(url, headers=headers, params=params)
+    tokens = response.json()
+
+    total_stable_usd = 0
+    stable_breakdown = []
+
+    for token in tokens:
+        if not isinstance(token, dict):
+            continue
+        symbol = token.get("symbol", "").lower()
+        amount = token.get("amount", 0)
+        price = token.get("price", 0)
+        chain = token.get("chain", "unknown")
+        usd_value = amount * price
+
+        if any(stable in symbol for stable in STABLES) and usd_value > 1:
+            total_stable_usd += usd_value
+            stable_breakdown.append({
+                "token": token.get("symbol"),
+                "chain": chain,
+                "amount": round(amount, 2),
+                "usd_value": round(usd_value, 2)
+            })
+
+    return total_stable_usd, stable_breakdown
+
+
+# ---- Step 2: Assign persona based on balance ----
+def assign_persona(total_stable_usd):
+    if total_stable_usd < 5000:
+        return "retail"
+    elif total_stable_usd < 100000:
+        return "power"
+    else:
+        return "dao"
+
+
+# ---- Step 3: Fetch live yield data ----
 def get_yield_data():
     print("Fetching live yield data from DeFiLlama...")
     url = "https://yields.llama.fi/pools"
@@ -37,11 +96,11 @@ def get_yield_data():
     return results
 
 
-# ---- Step 2: Persona prompts ----
+# ---- Step 4: Persona prompts ----
 PERSONAS = {
     "retail": """You are YieldScout in RETAIL MODE.
 
-Your audience is everyday DeFi users — beginners to intermediate. They want simple, safe, actionable advice.
+Your audience is everyday DeFi users with smaller balances under $5,000. They want simple, safe, actionable advice.
 
 Analyze the yield data and respond with:
 
@@ -62,7 +121,7 @@ Keep it friendly, simple, and encouraging. No jargon.""",
 
     "power": """You are YieldScout in POWER USER MODE.
 
-Your audience is crypto-native DeFi veterans. They understand impermanent loss, CLMM positions, TVL dynamics, and protocol risk.
+Your audience is crypto-native DeFi veterans with $5,000 - $100,000 in stablecoins. They understand impermanent loss, CLMM positions, TVL dynamics, and protocol risk.
 
 Analyze the yield data and respond with:
 
@@ -84,7 +143,7 @@ Be direct, technical, and sharp. Assume full DeFi literacy.""",
 
     "dao": """You are YieldScout in DAO / TREASURY MODE.
 
-Your audience is DAOs and treasury managers deploying large capital ($500K+). They prioritize capital preservation, protocol reputation, and sustainable yield over chasing APY.
+Your audience is DAOs and treasury managers with over $100,000 in stablecoins. They prioritize capital preservation, protocol reputation, and sustainable yield.
 
 Analyze the yield data and respond with:
 
@@ -106,10 +165,10 @@ Be formal, precise, and risk-conscious. This is institutional-grade advice."""
 }
 
 
-# ---- Step 3: Run YieldScout with persona ----
-def run_yieldscout(pools, mode="retail"):
+# ---- Step 5: Run YieldScout ----
+def run_yieldscout(pools, mode, wallet_summary):
     client = OpenAI(
-        api_key=os.getenv("SWARMS_API_KEY"),
+        api_key=SWARMS_API_KEY,
         base_url="https://api.swarms.world/v1"
     )
 
@@ -125,7 +184,13 @@ def run_yieldscout(pools, mode="retail"):
             },
             {
                 "role": "user",
-                "content": f"Here is the current live yield data from DeFiLlama. Produce your report:\n\n{data_str}"
+                "content": f"""Wallet Summary:
+{wallet_summary}
+
+Live yield data from DeFiLlama:
+{data_str}
+
+Produce your full research report based on this wallet's profile and the current yield opportunities."""
             }
         ],
         max_tokens=1024,
@@ -134,22 +199,30 @@ def run_yieldscout(pools, mode="retail"):
     return response.choices[0].message.content
 
 
-# ---- Step 4: Main ----
+# ---- Step 6: Main ----
 if __name__ == "__main__":
+    wallet = input("Enter your wallet address: ").strip()
+
+    total_stable, breakdown = get_stable_balance(wallet)
+
+    if total_stable == 0:
+        print("No stablecoin balance detected across major chains.")
+        print("Defaulting to Retail Mode.\n")
+        mode = "retail"
+        wallet_summary = "Wallet has no detected stablecoin balance."
+    else:
+        mode = assign_persona(total_stable)
+        wallet_summary = f"Total stablecoin balance: ${total_stable:,.2f}\n\nBreakdown:\n"
+        for item in breakdown:
+            wallet_summary += f"  - {item['token']} on {item['chain']}: ${item['usd_value']:,.2f}\n"
+
+    print(f"Total Stablecoin Balance: ${total_stable:,.2f}")
+    print(f"Assigned Persona: {mode.upper()} MODE\n")
+
     pools = get_yield_data()
 
-    print("\n🔍 Select your mode:")
-    print("  1 - Retail (beginner-friendly)")
-    print("  2 - Power User (advanced DeFi)")
-    print("  3 - DAO / Treasury (institutional)\n")
-
-    choice = input("Enter 1, 2, or 3: ").strip()
-
-    mode_map = {"1": "retail", "2": "power", "3": "dao"}
-    mode = mode_map.get(choice, "retail")
-
-    print(f"\nYieldScout ({mode.upper()} MODE) is analyzing the market...\n")
-    report = run_yieldscout(pools, mode=mode)
+    print(f"YieldScout ({mode.upper()} MODE) is analyzing the market...\n")
+    report = run_yieldscout(pools, mode, wallet_summary)
 
     print(f"\n========== YIELDSCOUT REPORT [{mode.upper()}] ==========\n")
     print(report)
